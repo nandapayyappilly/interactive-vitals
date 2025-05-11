@@ -30,8 +30,8 @@ const area = d3.area()
 
 const color = d3.scaleOrdinal(d3.schemeCategory10);
 
-const vitalSelect = d3.select("body").insert("select", ":first-child").attr("id", "vitalSelect");
-const groupSelect = d3.select("body").insert("select", ":first-child").attr("id", "groupSelect");
+const vitalSelect = d3.select("#vitalSelect");
+const groupSelect = d3.select("#groupSelect");
 
 d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
   data.forEach(d => d.signal = d.signal.toLowerCase());
@@ -93,25 +93,21 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       .attr("stroke", "none")
       .attr("d", d => area(d.values));
 
-      svg.selectAll(".legend").remove();
-      const legend = svg.selectAll(".legend")
+      const legendContainer = d3.select("#legend");
+      legendContainer.html(""); 
+      const legendItems = legendContainer.selectAll("div")
         .data(summary.map(d => d.key))
         .enter()
-        .append("g")
-        .attr("class", "legend")
-        .attr("transform", (d, i) => `translate(${width - 150}, ${i * 20})`);
-      
-      legend.append("rect")
-        .attr("width", 10)
-        .attr("height", 10)
-        .attr("fill", d => color(d));
-      
-      legend.append("text")
-        .attr("x", 15)
-        .attr("y", 10)
-        .text(d => d.length > 12 ? d.slice(0, 12) + "…" : d)
-        .style("font-size", "12px")
-        .attr("alignment-baseline", "middle");
+        .append("div")
+        .attr("class", "legend-item");
+        
+        legendItems.append("span")
+        .attr("class", "legend-color")
+        .style("background-color", d => color(d));
+        
+        legendItems.append("span")
+        .attr("class", "legend-label")
+        .text(d => d.length > 20 ? d.slice(0, 18) + "…" : d);
   }
 
   vitalSelect.on("change", updateChart);
