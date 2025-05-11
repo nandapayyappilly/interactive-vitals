@@ -33,12 +33,12 @@ const color = d3.scaleOrdinal(d3.schemeCategory10);
 const vitalSelect = d3.select("body").insert("select", ":first-child").attr("id", "vitalSelect");
 const groupSelect = d3.select("body").insert("select", ":first-child").attr("id", "groupSelect");
 
-d3.csv("cleaned_surgery_long.csv", d3.autoType).then(data => {
+d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
 
     data.forEach(d => {
         d.signal = d.signal.toLowerCase();
       });
-      
+
   const vitals = [...new Set(data.map(d => d.signal))];
   const groups = ["optype", "emop"];
 
