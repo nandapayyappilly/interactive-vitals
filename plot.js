@@ -64,7 +64,7 @@ function updateChart(data, signal, groupby) {
     .attr("d", d => line(d.values));
 }
 
-d3.csv("data.csv").then(data => {
+d3.csv("data/long_surgery_vitals.csv").then(data => {
   data.forEach(d => {
     d.norm_time = +d.norm_time;
     d.value = +d.value;
