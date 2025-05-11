@@ -96,19 +96,17 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       const legendContainer = d3.select("#legend");
       legendContainer.html(""); 
       const legendItems = legendContainer.selectAll("div")
-        .data(summary.map(d => d.key))
-        .enter()
-        .append("div")
-        .attr("class", "legend-item");
-        
-        legendItems.append("span")
-        .attr("class", "legend-color")
-        .style("background-color", d => color(d));
-        
-        legendItems.append("span")
-        .attr("class", "legend-label")
-        .text(d => d.length > 20 ? d.slice(0, 18) + "…" : d);
-  }
+      .data(summary.map(d => d.key))
+      .enter()
+      .append("div")
+      .attr("class", "legend-item");
+      legendItems.append("span")
+      .attr("class", "legend-color")
+      .style("background-color", d => color(d));
+      legendItems.append("span")
+      .attr("class", "legend-label")
+      .text(d => d.length > 20 ? d.slice(0, 18) + "…" : d);
+    }
 
   vitalSelect.on("change", updateChart);
   groupSelect.on("change", updateChart);
