@@ -3,56 +3,61 @@ body {
     background-color: #f9fafb;
     padding: 2rem;
     color: #1f2937;
-  }
+}
   
-  h1 {
+h1 {
     font-size: 2rem;
     margin-bottom: 1rem;
-  }
+}
   
-  #controls {
+#controls {
     margin-bottom: 1.5rem;
-  }
+}
   
-  #controls label {
+#controls label {
     font-weight: 600;
     margin-right: 0.5rem;
-  }
+}
   
-  #controls select {
+#controls select {
     margin-right: 1.5rem;
     padding: 0.3rem 0.5rem;
     font-size: 0.95rem;
-  }
+}
   
-  #chart-container {
+#chart-container {
     display: flex;
     gap: 30px;
     align-items: flex-start;
-  }
+}
   
-  svg {
+svg {
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-  }
+}
   
-  #legend {
+#legend {
     display: flex;
     flex-direction: column;
     gap: 8px;
     margin-top: 20px;
     font-size: 13px;
-  }
+}
   
-  .legend-item {
+.legend-item {
     display: flex;
     align-items: center;
-  }
+}
   
-  .legend-color {
+.legend-color {
     width: 14px;
     height: 14px;
     margin-right: 8px;
     border-radius: 3px;
+}
+
+.axis-label {
+    font-size: 14px;
+    fill: #333;
   }
