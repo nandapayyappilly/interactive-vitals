@@ -14,6 +14,21 @@ const y = d3.scaleLinear().range([height, 0]);
 svg.append("g").attr("transform", `translate(0,${height})`).attr("class", "x-axis");
 svg.append("g").attr("class", "y-axis");
 
+svg.append("text")
+  .attr("text-anchor", "middle")
+  .attr("x", width / 2)
+  .attr("y", height + margin.bottom - 5)
+  .attr("class", "axis-label")
+  .text("Progress Through Surgery");
+
+svg.append("text")
+  .attr("text-anchor", "middle")
+  .attr("transform", `rotate(-90)`)
+  .attr("x", -height / 2)
+  .attr("y", -margin.left + 15)
+  .attr("class", "axis-label")
+  .text("Average Vital Value");
+
 const xAxis = d3.axisBottom(x).tickFormat(d3.format(".0%"));
 const yAxis = d3.axisLeft(y);
 
