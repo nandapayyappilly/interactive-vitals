@@ -1,6 +1,6 @@
 const margin = { top: 50, right: 40, bottom: 50, left: 60 },
-      width = 900 - margin.left - margin.right,
-      height = 400 - margin.top - margin.bottom;
+const width = 1100 - margin.left - margin.right;
+height = 400 - margin.top - margin.bottom;
 
 const svg = d3.select("svg")
     .attr("width", width + margin.left + margin.right)
@@ -93,27 +93,25 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       .attr("stroke", "none")
       .attr("d", d => area(d.values));
 
-    svg.selectAll(".legend").remove();
-
-    const legend = svg.selectAll(".legend")
-      .data(summary.map(d => d.key))
-      .enter()
-      .append("g")
-      .attr("class", "legend")
-      .attr("transform", (d, i) => `translate(0, ${i * 20})`);
-
-    legend.append("rect")
-      .attr("x", width + 10)
-      .attr("width", 10)
-      .attr("height", 10)
-      .style("fill", d => color(d));
-
-    legend.append("text")
-      .attr("x", width + 25)
-      .attr("y", 9)
-      .text(d => d)
-      .style("font-size", "12px")
-      .attr("alignment-baseline", "middle");
+      svg.selectAll(".legend").remove();
+      const legend = svg.selectAll(".legend")
+        .data(summary.map(d => d.key))
+        .enter()
+        .append("g")
+        .attr("class", "legend")
+        .attr("transform", (d, i) => `translate(${width - 150}, ${i * 20})`);
+      
+      legend.append("rect")
+        .attr("width", 10)
+        .attr("height", 10)
+        .attr("fill", d => color(d));
+      
+      legend.append("text")
+        .attr("x", 15)
+        .attr("y", 10)
+        .text(d => d.length > 12 ? d.slice(0, 12) + "…" : d)
+        .style("font-size", "12px")
+        .attr("alignment-baseline", "middle");
   }
 
   vitalSelect.on("change", updateChart);
