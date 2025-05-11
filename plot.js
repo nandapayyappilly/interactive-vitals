@@ -11,22 +11,22 @@ const svg = d3.select("svg")
 const x = d3.scaleLinear().domain([0, 1]).range([0, width]);
 const y = d3.scaleLinear().range([height, 0]);
 
-const xAxis = d3.axisBottom(x).tickFormat(d3.format(".0%"));
-const yAxis = d3.axisLeft(y);
-
 svg.append("g").attr("transform", `translate(0,${height})`).attr("class", "x-axis");
 svg.append("g").attr("class", "y-axis");
 
+const xAxis = d3.axisBottom(x).tickFormat(d3.format(".0%"));
+const yAxis = d3.axisLeft(y);
+
 const line = d3.line()
-    .x(d => x(d.norm_time))
-    .y(d => y(d.mean))
-    .curve(d3.curveMonotoneX);
+  .x(d => x(d.norm_time))
+  .y(d => y(d.mean))
+  .curve(d3.curveMonotoneX);
 
 const area = d3.area()
-    .x(d => x(d.norm_time))
-    .y0(d => y(d.mean - d.sd))
-    .y1(d => y(d.mean + d.sd))
-    .curve(d3.curveMonotoneX);
+  .x(d => x(d.norm_time))
+  .y0(d => y(d.mean - (d.sd || 0)))
+  .y1(d => y(d.mean + (d.sd || 0)))
+  .curve(d3.curveMonotoneX);
 
 const color = d3.scaleOrdinal(d3.schemeCategory10);
 
@@ -34,10 +34,7 @@ const vitalSelect = d3.select("body").insert("select", ":first-child").attr("id"
 const groupSelect = d3.select("body").insert("select", ":first-child").attr("id", "groupSelect");
 
 d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
-
-    data.forEach(d => {
-        d.signal = d.signal.toLowerCase();
-      });
+  data.forEach(d => d.signal = d.signal.toLowerCase());
 
   const vitals = [...new Set(data.map(d => d.signal))];
   const groups = ["optype", "emop"];
@@ -48,7 +45,8 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
 
   groupSelect.selectAll("option")
     .data(groups).enter().append("option")
-    .text(d => d === "optype" ? "Surgery Type" : "Emergency Status").attr("value", d => d);
+    .text(d => d === "optype" ? "Surgery Type" : "Emergency Status")
+    .attr("value", d => d);
 
   function updateChart() {
     const selectedVital = vitalSelect.property("value");
@@ -58,19 +56,24 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
     const nested = d3.groups(filtered, d => d[selectedGroup]);
 
     const summary = nested.map(([key, values]) => {
-      const byTime = d3.groups(values, d => d.norm_time).map(([t, pts]) => {
-        const v = pts.map(p => p.value);
-        return {
-          norm_time: +t,
-          mean: d3.mean(v),
-          sd: d3.deviation(v)
-        };
-      });
-      return { key, values: byTime.sort((a, b) => a.norm_time - b.norm_time) };
+      const binSize = 0.01;
+      const binned = d3.groups(values, d => Math.round(d.norm_time / binSize) * binSize)
+        .map(([t, pts]) => {
+          const v = pts.map(p => p.value);
+          return {
+            norm_time: +t,
+            mean: d3.mean(v),
+            sd: d3.deviation(v)
+          };
+        });
+
+      return { key, values: binned.sort((a, b) => a.norm_time - b.norm_time) };
     });
 
-    y.domain([d3.min(summary, s => d3.min(s.values, d => d.mean - d.sd)),
-              d3.max(summary, s => d3.max(s.values, d => d.mean + d.sd))]);
+    y.domain([
+      d3.min(summary, s => d3.min(s.values, d => d.mean - (d.sd || 0))),
+      d3.max(summary, s => d3.max(s.values, d => d.mean + (d.sd || 0)))
+    ]);
 
     svg.select(".x-axis").call(xAxis);
     svg.select(".y-axis").call(yAxis);
@@ -94,6 +97,9 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
 
   vitalSelect.on("change", updateChart);
   groupSelect.on("change", updateChart);
+
+  vitalSelect.property("value", "map");
+  groupSelect.property("value", "emop");
+
   updateChart();
 });
-
