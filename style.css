@@ -1,0 +1,52 @@
+body {
+    font-family: 'Helvetica Neue', sans-serif;
+    background: #f9fafb;
+    color: #333;
+    padding: 30px;
+    margin: 0;
+  }
+  
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #111827;
+  }
+  
+  label {
+    font-weight: 500;
+    margin-right: 10px;
+  }
+  
+  select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-right: 20px;
+    font-size: 0.95rem;
+    background-color: white;
+    color: #111;
+  }
+  
+  svg {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    overflow: visible;
+  }
+    .line {
+    stroke-width: 2;
+  }
+  
+  .area {
+    fill-opacity: 0.2;
+  }
+  
+  .legend rect {
+    stroke: #444;
+    stroke-width: 0.5;
+  }
+  
+  .legend text {
+    font-size: 13px;
+    fill: #333;
+  }
