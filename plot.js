@@ -1,91 +1,100 @@
 const svg = d3.select("svg"),
-      width = +svg.attr("width") - 60,
-      height = +svg.attr("height") - 60,
-      margin = { top: 30, right: 30, bottom: 50, left: 60 };
+      width = +svg.attr("width") - 100,
+      height = +svg.attr("height") - 100,
+      margin = { top: 50, right: 50, bottom: 50, left: 50 };
 
-const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+const chart = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-let xScale = d3.scaleLinear().range([0, width]);
-let yScale = d3.scaleLinear().range([height, 0]);
+const xScale = d3.scaleLinear().domain([0, 1]).range([0, width]);
+const yScale = d3.scaleLinear().range([height, 0]);
 
 const color = d3.scaleOrdinal(d3.schemeTableau10);
 
-const xAxis = g.append("g").attr("transform", `translate(0,${height})`);
-const yAxis = g.append("g");
+const xAxis = chart.append("g").attr("transform", `translate(0,${height})`);
+const yAxis = chart.append("g");
 
-const line = d3.line()
-  .x(d => xScale(d.norm_time))
-  .y(d => yScale(d.avg));
+const vitalSelect = d3.select("body").insert("select", ":first-child")
+  .attr("id", "vital-select")
+  .selectAll("option")
+  .data(["map", "hr", "spo2"])
+  .enter().append("option")
+  .text(d => d.toUpperCase());
 
-function updateChart(data, signal, groupby) {
-  const nested = d3.groups(data, d => d[groupby]);
+const groupSelect = d3.select("body").insert("select", ":first-child")
+  .attr("id", "group-select")
+  .selectAll("option")
+  .data(["optype", "emop"])
+  .enter().append("option")
+  .text(d => d === "optype" ? "Surgery Type" : "Emergency Flag");
 
-  const summarized = nested.map(([key, values]) => {
-    const bins = d3.bin()
-      .value(d => d.norm_time)
-      .thresholds(100)(values);
+d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
+  update("map", "optype");
 
-    const points = bins.map(bin => {
-      const avg = d3.mean(bin, d => +d.value);
-      return {
-        norm_time: d3.mean(bin, d => d.norm_time),
-        avg: avg
-      };
+  d3.select("#vital-select").on("change", function() {
+    const vital = this.value;
+    const group = document.getElementById("group-select").value;
+    update(vital, group);
+  });
+
+  d3.select("#group-select").on("change", function() {
+    const group = this.value;
+    const vital = document.getElementById("vital-select").value;
+    update(vital, group);
+  });
+
+  function update(vital, group) {
+    const nested = d3.groups(
+      data.filter(d => d.signal === vital && !isNaN(d.value)),
+      d => d[group]
+    );
+
+    const line = d3.line()
+      .x(d => xScale(d.norm_time))
+      .y(d => yScale(d.mean));
+
+    const area = d3.area()
+      .x(d => xScale(d.norm_time))
+      .y0(d => yScale(d.mean - d.stdev))
+      .y1(d => yScale(d.mean + d.stdev));
+
+    const summary = nested.map(([key, values]) => {
+      const binned = d3.bin()
+        .value(d => d.norm_time)
+        .thresholds(100)(values);
+      const points = binned.map(bin => {
+        const mean = d3.mean(bin, d => d.value);
+        const stdev = d3.deviation(bin, d => d.value) || 0;
+        return {
+          norm_time: (bin.x0 + bin.x1) / 2,
+          mean,
+          stdev
+        };
+      }).filter(d => !isNaN(d.mean));
+      return { key, points };
     });
 
-    return {
-      key: key,
-      values: points
-    };
-  });
+    yScale.domain([d3.min(summary, s => d3.min(s.points, d => d.mean - d.stdev)),
+                   d3.max(summary, s => d3.max(s.points, d => d.mean + d.stdev))]);
 
-  const allPoints = summarized.flatMap(d => d.values);
-  xScale.domain([0, 1]);
-  yScale.domain([d3.min(allPoints, d => d.avg) - 5, d3.max(allPoints, d => d.avg) + 5]);
+    xAxis.call(d3.axisBottom(xScale).tickFormat(d => `${Math.round(d * 100)}%`));
+    yAxis.call(d3.axisLeft(yScale));
 
-  xAxis.transition().call(d3.axisBottom(xScale).ticks(10).tickFormat(d3.format(".0%")));
-  yAxis.transition().call(d3.axisLeft(yScale));
+    chart.selectAll(".group").remove();
 
-  const groups = g.selectAll(".line-group")
-    .data(summarized, d => d.key);
+    const groups = chart.selectAll(".group")
+      .data(summary)
+      .enter().append("g")
+      .attr("class", "group");
 
-  groups.exit().remove();
+    groups.append("path")
+      .attr("fill", (d, i) => color(i))
+      .attr("opacity", 0.2)
+      .attr("d", d => area(d.points));
 
-  const newGroups = groups.enter()
-    .append("g")
-    .attr("class", "line-group");
-
-  newGroups.append("path")
-    .attr("class", "line")
-    .style("stroke", d => color(d.key));
-
-  groups.merge(newGroups).select(".line")
-    .transition()
-    .attr("d", d => line(d.values));
-}
-
-d3.csv("data/long_surgery_vitals.csv").then(data => {
-  data.forEach(d => {
-    d.norm_time = +d.norm_time;
-    d.value = +d.value;
-  });
-
-  const signalSelect = d3.select("#signal");
-  const groupSelect = d3.select("#groupby");
-
-  function filteredData() {
-    const signal = signalSelect.property("value");
-    return data.filter(d => d.signal === signal);
+    groups.append("path")
+      .attr("stroke", (d, i) => color(i))
+      .attr("fill", "none")
+      .attr("stroke-width", 2)
+      .attr("d", d => line(d.points));
   }
-
-  function refresh() {
-    const signal = signalSelect.property("value");
-    const groupby = groupSelect.property("value");
-    updateChart(filteredData(), signal, groupby);
-  }
-
-  signalSelect.on("change", refresh);
-  groupSelect.on("change", refresh);
-
-  refresh();
 });
