@@ -66,7 +66,6 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
             sd: d3.deviation(v)
           };
         });
-
       return { key, values: binned.sort((a, b) => a.norm_time - b.norm_time) };
     });
 
@@ -93,6 +92,28 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       .attr("fill-opacity", 0.2)
       .attr("stroke", "none")
       .attr("d", d => area(d.values));
+
+    svg.selectAll(".legend").remove();
+
+    const legend = svg.selectAll(".legend")
+      .data(summary.map(d => d.key))
+      .enter()
+      .append("g")
+      .attr("class", "legend")
+      .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+    legend.append("rect")
+      .attr("x", width + 10)
+      .attr("width", 10)
+      .attr("height", 10)
+      .style("fill", d => color(d));
+
+    legend.append("text")
+      .attr("x", width + 25)
+      .attr("y", 9)
+      .text(d => d)
+      .style("font-size", "12px")
+      .attr("alignment-baseline", "middle");
   }
 
   vitalSelect.on("change", updateChart);
@@ -100,6 +121,5 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
 
   vitalSelect.property("value", "map");
   groupSelect.property("value", "emop");
-
   updateChart();
 });
