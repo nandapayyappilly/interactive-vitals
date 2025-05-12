@@ -48,6 +48,8 @@ const color = d3.scaleOrdinal(d3.schemeCategory10);
 const vitalSelect = d3.select("#vitalSelect");
 const groupSelect = d3.select("#groupSelect");
 
+let activeGroups = new Set();
+
 d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
   data.forEach(d => d.signal = d.signal.toLowerCase());
 
@@ -83,16 +85,18 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
         });
       return { key, values: binned.sort((a, b) => a.norm_time - b.norm_time) };
     });
+    //visable being the types of surgey we want to dispaly 
+    const visible = summary.filter(d => activeGroups.size === 0 || activeGroups.has(d.key));
 
     y.domain([
-      d3.min(summary, s => d3.min(s.values, d => d.mean - (d.sd || 0))),
-      d3.max(summary, s => d3.max(s.values, d => d.mean + (d.sd || 0)))
+      d3.min(visible, s => d3.min(s.values, d => d.mean - (d.sd || 0))),
+      d3.max(visible, s => d3.max(s.values, d => d.mean + (d.sd || 0)))
     ]);
 
     svg.select(".x-axis").call(xAxis);
     svg.select(".y-axis").call(yAxis);
 
-    svg.selectAll(".line").data(summary, d => d.key)
+    svg.selectAll(".line").data(visible, d => d.key)
       .join("path")
       .attr("class", "line")
       .attr("fill", "none")
@@ -100,7 +104,7 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       .attr("stroke-width", 2)
       .attr("d", d => line(d.values));
 
-    svg.selectAll(".area").data(summary, d => d.key)
+    svg.selectAll(".area").data(visible, d => d.key)
       .join("path")
       .attr("class", "area")
       .attr("fill", d => color(d.key))
@@ -108,24 +112,45 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       .attr("stroke", "none")
       .attr("d", d => area(d.values));
 
-      const legendContainer = d3.select("#legend");
-      legendContainer.html(""); 
-      const legendItems = legendContainer.selectAll("div")
+// Added interation with the legend so user can click on type of surgery on the legend
+    const legendContainer = d3.select("#legend");
+    legendContainer.html("");
+    const legendItems = legendContainer.selectAll("div")
       .data(summary.map(d => d.key))
       .enter()
       .append("div")
-      .attr("class", "legend-item");
-      legendItems.append("span")
+      .attr("class", "legend-item")
+      .style("cursor", "pointer")
+      //lets user know what is selected by increaseing opacity of selected surguries 
+      .style("opacity", d => activeGroups.size === 0 || activeGroups.has(d) ? 1 : 0.3)
+      .on("click", (event, key) => {
+        if (activeGroups.has(key)) {
+          activeGroups.delete(key);
+        } else {
+          activeGroups.add(key);
+        }
+        updateChart();
+      })
+      .on("mouseover", (event, key) => {
+        svg.selectAll(".line").style("opacity", d => d.key === key ? 1 : 0.1);
+        svg.selectAll(".area").style("opacity", d => d.key === key ? 0.3 : 0.05);
+      })
+      .on("mouseout", () => {
+        svg.selectAll(".line").style("opacity", 1);
+        svg.selectAll(".area").style("opacity", 0.2);
+      });
+
+    legendItems.append("span")
       .attr("class", "legend-color")
       .style("background-color", d => color(d));
-      legendItems.append("span")
+
+    legendItems.append("span")
       .attr("class", "legend-label")
       .text(d => d.length > 20 ? d.slice(0, 18) + "…" : d);
-    }
+  }
 
   vitalSelect.on("change", updateChart);
   groupSelect.on("change", updateChart);
-
   vitalSelect.property("value", "map");
   groupSelect.property("value", "emop");
   updateChart();
