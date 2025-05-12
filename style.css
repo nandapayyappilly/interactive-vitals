@@ -61,3 +61,26 @@ svg {
     font-size: 14px;
     fill: #333;
   }
+
+.drug-marker {
+    pointer-events: all;
+  }
+
+/* #controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+    align-items: center;
+  }
+
+  #controls label {
+    font-weight: bold;
+  }
+  
+  #controls select {
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+   */
+  
