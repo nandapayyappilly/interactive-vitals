@@ -8,6 +8,9 @@ const svg = d3.select("svg")
   .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
+const tooltip = d3.select("#tooltip");
+const drugSelect = d3.select("#drugSelect");
+
 const x = d3.scaleLinear().domain([0, 1]).range([0, width]);
 const y = d3.scaleLinear().range([height, 0]);
 
@@ -50,8 +53,35 @@ const groupSelect = d3.select("#groupSelect");
 
 let activeGroups = new Set();
 
-d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
-  data.forEach(d => d.signal = d.signal.toLowerCase());
+//loading all data
+Promise.all([
+    d3.csv("data/long_surgery_vitals.csv", d3.autoType),
+    d3.csv("data/anesthetic_start_times.csv", d3.autoType)
+    ]).then(([data, anesthetics]) => {
+    data.forEach(d => d.signal = d.signal.toLowerCase());
+
+    const allDrugs = [...new Set(anesthetics
+        .map(d => d.tname)
+        .filter(name => name.toLowerCase().includes("rate"))
+      )];      
+    const drugNameMap = {
+        "orchestra/rftn20_rate": "Remifentanil",
+        "orchestra/ppf20_rate": "Propofol"
+      };
+      
+
+    drugSelect.selectAll("option")
+      .data(["All", ...allDrugs])
+      .enter().append("option")
+      .text(d => d === "All" ? "All" : drugNameMap[d.toLowerCase()] || d)
+      .attr("value", d => d);
+    
+
+    anesthetics.forEach(d => {
+        d.tname = d.tname.toLowerCase();
+        d.optype = d.optype.trim();
+    });
+
 
   const vitals = [...new Set(data.map(d => d.signal))];
   const groups = ["optype", "emop"];
@@ -68,6 +98,7 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
   function updateChart() {
     const selectedVital = vitalSelect.property("value");
     const selectedGroup = groupSelect.property("value");
+    const selectedDrug = drugSelect.property("value").toLowerCase();
 
     const filtered = data.filter(d => d.signal === selectedVital);
     const nested = d3.groups(filtered, d => d[selectedGroup]);
@@ -112,6 +143,76 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       .attr("stroke", "none")
       .attr("d", d => area(d.values));
 
+    // Added anesthesia start markers
+    svg.selectAll(".drug-marker").remove();
+
+    visible.forEach(group => {
+      const groupKey = group.key;
+
+      const matchingDrugs = d3.groups(
+        anesthetics.filter(d =>
+          d[selectedGroup] === groupKey &&
+          (selectedDrug.toLowerCase() === "all" || d.tname === selectedDrug) &&
+          !isNaN(d.surgery_duration) &&
+          d.surgery_duration > 0
+        ),
+        d => d.tname
+       ).map(([drugName, entries]) => {
+        const avgStartNorm = d3.mean(entries, d => d.norm_start_time);
+        const avgDuration = d3.mean(entries, d => d.surgery_duration);
+        const start_time_sec = avgStartNorm * avgDuration;
+      
+        return {
+          tname: drugName,
+          norm_start_time: avgStartNorm,
+          start_time_sec: start_time_sec
+        };
+      });
+      
+      
+
+      matchingDrugs.forEach(d => {
+        const drugColor = color(groupKey);
+
+        svg.append("line")
+          .attr("class", "drug-marker")
+          .attr("x1", x(d.norm_start_time))
+          .attr("x2", x(d.norm_start_time))
+          .attr("y1", 0)
+          .attr("y2", height)
+          .attr("stroke", drugColor)
+          .attr("stroke-dasharray", "2,2")
+          .attr("stroke-width", 1.2);
+
+          svg.append("circle")
+          .attr("class", "drug-marker")
+          .attr("cx", x(d.norm_start_time))
+          .attr("cy", 0)
+          .attr("r", 4)
+          .attr("fill", color(groupKey))
+          .on("mouseover", function(event) {
+            d3.select(this)
+              .transition().duration(100)
+              .attr("r", 6);
+        
+            tooltip
+              .style("opacity", 1)
+              .html(`
+                <strong>${drugNameMap[d.tname] || d.tname}</strong><br>
+                Surgery: ${groupKey}<br>
+                Start of Drug: ${(d.norm_start_time * 100).toFixed(1)}% into surgery<br>
+                Elapsed Time: ${Math.floor(d.start_time_sec / 60)} min ${Math.round(d.start_time_sec % 60)} sec
+              `)
+              .style("left", (event.pageX + 8) + "px")
+              .style("top", (event.pageY - 28) + "px");
+          })
+          .on("mouseout", function() {
+            d3.select(this).transition().duration(100).attr("r", 4);
+            tooltip.style("opacity", 0);
+          });        
+      });
+    });
+
 // Added interation with the legend so user can click on type of surgery on the legend
     const legendContainer = d3.select("#legend");
     legendContainer.html("");
@@ -151,7 +252,9 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
 
   vitalSelect.on("change", updateChart);
   groupSelect.on("change", updateChart);
+  drugSelect.on("change", updateChart);
   vitalSelect.property("value", "map");
   groupSelect.property("value", "emop");
+  drugSelect.property("value", "All");
   updateChart();
 });
