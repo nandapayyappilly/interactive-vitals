@@ -40,17 +40,9 @@ const line = d3.line()
   .y(d => y(d.mean))
   .curve(d3.curveMonotoneX);
 
-const area = d3.area()
-  .x(d => x(d.norm_time))
-  .y0(d => y(d.mean - (d.sd || 0)))
-  .y1(d => y(d.mean + (d.sd || 0)))
-  .curve(d3.curveMonotoneX);
-
 const color = d3.scaleOrdinal(d3.schemeCategory10);
 
 const vitalSelect = d3.select("#vitalSelect");
-vitalSelect.attr("multiple", true);
-
 const groupSelect = d3.select("#groupSelect");
 
 let activeGroups = new Set();
