@@ -125,6 +125,44 @@ Promise.all([
     ]);
 
     svg.select(".x-axis").call(xAxis);
+
+    
+  // Add shaded zones only for danger area
+  if (
+    vitalSelect.property("value").toLowerCase() === "map" &&
+    groupSelect.property("value") === "optype"
+  ){
+    const yMin = y.domain()[0];
+    const yMax = y.domain()[1];
+
+    const dangerZones = [
+      {
+        label: "Dangerously Low (< 60)",
+        min: Math.max(0, yMin),
+        max: Math.min(60, yMax),
+        color: "#fdd"
+      },
+      {
+        label: "Potentially High (> 120)",
+        min: Math.max(120, yMin),
+        max: Math.min(200, yMax),
+        color: "#ffe5b4"
+      }
+    ];
+
+    dangerZones.forEach(zone => {
+      if (zone.min < zone.max) {
+        svg.append("rect")
+          .attr("class", "danger-zone")
+          .attr("x", 0)
+          .attr("width", width)
+          .attr("y", y(zone.max))
+          .attr("height", y(zone.min) - y(zone.max))
+          .attr("fill", zone.color)
+          .attr("opacity", 0.4);
+      }
+    });
+  }
     svg.select(".y-axis").call(yAxis);
 
     svg.selectAll(".line").data(visible, d => d.key)
@@ -244,6 +282,29 @@ Promise.all([
     legendItems.append("span")
       .attr("class", "legend-color")
       .style("background-color", d => color(d));
+
+      if (
+        vitalSelect.property("value").toLowerCase() === "map" &&
+        groupSelect.property("value") === "optype"
+      ) {
+        [
+          { label: "Dangerously Low (< 60)", color: "#fdd" },
+          { label: "Potentially High (> 120)", color: "#ffe5b4" }
+        ].forEach(zone => {
+          const item = legendContainer.append("div")
+            .attr("class", "legend-item")
+            .style("opacity", 1);
+      
+          item.append("span")
+            .attr("class", "legend-color")
+            .style("background-color", zone.color);
+      
+          item.append("span")
+            .attr("class", "legend-label")
+            .text(zone.label);
+        });
+      }
+
 
     legendItems.append("span")
       .attr("class", "legend-label")
