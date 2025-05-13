@@ -163,7 +163,7 @@ Promise.all([
           .attr("y", y(zone.max))
           .attr("height", y(zone.min) - y(zone.max))
           .attr("fill", zone.color)
-          .attr("opacity", 0.4);
+          .attr("opacity", 0.2);
       }
     });
   }
