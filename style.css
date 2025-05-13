@@ -83,4 +83,7 @@ svg {
     font-size: 14px;
   }
    */
-  
+   .hover-point {
+    transition: r 0.1s ease, fill-opacity 0.1s ease;
+    pointer-events: all;
+  }

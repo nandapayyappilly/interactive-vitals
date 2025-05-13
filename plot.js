@@ -108,12 +108,16 @@ Promise.all([
       const binned = d3.groups(values, d => Math.round(d.norm_time / binSize) * binSize)
         .map(([t, pts]) => {
           const v = pts.map(p => p.value);
+          const mean = d3.mean(v);
+          const sd = d3.deviation(v);
           return {
             norm_time: +t,
-            mean: d3.mean(v),
-            sd: d3.deviation(v)
+            mean: mean,
+            sd: sd,
+            value: v[0] // just grab the first one for now — can refine later
           };
         });
+      
       return { key, values: binned.sort((a, b) => a.norm_time - b.norm_time) };
     });
     //visable being the types of surgey we want to dispaly 
@@ -309,6 +313,58 @@ Promise.all([
     legendItems.append("span")
       .attr("class", "legend-label")
       .text(d => d.length > 20 ? d.slice(0, 18) + "…" : d);
+
+// Remove old hover points
+svg.selectAll(".hover-point").remove();
+
+  // Add hover dots + tooltip
+  visible.forEach(group => {
+    const groupKey = group.key;
+    const groupColor = color(groupKey);
+
+    svg.selectAll(`.hover-point-${groupKey}`)
+      .data(group.values)
+      .enter()
+      .append("circle")
+      .attr("class", "hover-point")
+      .attr("cx", d => x(d.norm_time))
+      .attr("cy", d => y(d.mean))
+      .attr("r", 5)
+      .attr("fill", groupColor)
+      .attr("fill-opacity", 0)
+      .attr("stroke", "none")
+      .on("mouseover", function(event, d) {
+        const zScore = d.sd ? ((d.value - d.mean) / d.sd).toFixed(2) : "N/A";
+
+        d3.select(this)
+          .transition().duration(100)
+          .attr("r", 6)
+          .attr("fill-opacity", 0.4);
+
+        tooltip
+          .style("opacity", 1)
+          .html(`
+            <strong>${selectedVital.toUpperCase()}</strong><br>
+            Value: ${d.value?.toFixed(1) ?? "N/A"}<br>
+            Mean: ${d.mean?.toFixed(1) ?? "N/A"}<br>
+            SD: ${d.sd?.toFixed(1) ?? "N/A"}<br>
+            Z-score: ${zScore}
+          `)
+          .style("left", (event.pageX + 10) + "px")
+          .style("top", (event.pageY - 28) + "px");
+      })
+      .on("mouseout", function() {
+        d3.select(this)
+          .transition().duration(100)
+          .attr("r", 5)
+          .attr("fill-opacity", 0);
+
+        tooltip.style("opacity", 0);
+      });
+  });
+
+
+
   }
 
   vitalSelect.on("change", updateChart);
