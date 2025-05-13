@@ -165,29 +165,29 @@ Promise.all([
       const legendContainer = d3.select("#legend");
       legendContainer.html("");
       const legendItems = legendContainer.selectAll("div")
-        .data(summary.map(d => d.key))
-        .enter()
-        .append("div")
-        .attr("class", "legend-item")
-        .style("cursor", "pointer")
-        .style("opacity", d => activeGroups.size === 0 || activeGroups.has(d.key.split(" - ")[0]) ? 1 : 0.3)
-        .on("click", (event, key) => {
-          const groupName = key.split(" - ")[0];
-          if (activeGroups.has(groupName)) {
-            activeGroups.delete(groupName);
-          } else {
-            activeGroups.add(groupName);
-          }
-          updateChart();
-        });
+      .data(summary)
+      .enter()
+      .append("div")
+      .attr("class", "legend-item")
+      .style("cursor", "pointer")
+      .style("opacity", d => activeGroups.size === 0 || activeGroups.has(d.key.split(" - ")[0]) ? 1 : 0.3)
+      .on("click", (event, d) => {
+        const groupName = d.key.split(" - ")[0];
+        if (activeGroups.has(groupName)) {
+          activeGroups.delete(groupName);
+        } else {
+          activeGroups.add(groupName);
+        }
+        updateChart();
+      });
 
-      legendItems.append("span")
-        .attr("class", "legend-color")
-        .style("background-color", d => color(d.key));
+    legendItems.append("span")
+      .attr("class", "legend-color")
+      .style("background-color", d => color(d.key));
 
-      legendItems.append("span")
-        .attr("class", "legend-label")
-        .text(d => d);
+    legendItems.append("span")
+      .attr("class", "legend-label")
+      .text(d => d.key.length > 20 ? d.key.slice(0, 18) + "…" : d.key);
     }
 
     vitalSelect.on("change", updateChart);
