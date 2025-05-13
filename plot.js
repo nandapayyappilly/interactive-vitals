@@ -177,14 +177,6 @@ Promise.all([
       .attr("stroke-width", 2)
       .attr("d", d => line(d.values));
 
-    svg.selectAll(".area").data(visible, d => d.key)
-      .join("path")
-      .attr("class", "area")
-      .attr("fill", d => color(d.key))
-      .attr("fill-opacity", 0.2)
-      .attr("stroke", "none")
-      .attr("d", d => area(d.values));
-
     // Added anesthesia start markers
     svg.selectAll(".drug-marker").remove();
 
