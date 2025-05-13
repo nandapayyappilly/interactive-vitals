@@ -40,12 +40,6 @@ const line = d3.line()
   .y(d => y(d.mean))
   .curve(d3.curveMonotoneX);
 
-const area = d3.area()
-  .x(d => x(d.norm_time))
-  .y0(d => y(d.mean - (d.sd || 0)))
-  .y1(d => y(d.mean + (d.sd || 0)))
-  .curve(d3.curveMonotoneX);
-
 const color = d3.scaleOrdinal(d3.schemeCategory10);
 
 const vitalSelect = d3.select("#vitalSelect");
@@ -53,246 +47,154 @@ const groupSelect = d3.select("#groupSelect");
 
 let activeGroups = new Set();
 
-//loading all data
 Promise.all([
     d3.csv("data/long_surgery_vitals.csv", d3.autoType),
     d3.csv("data/anesthetic_start_times.csv", d3.autoType)
-    ]).then(([data, anesthetics]) => {
+]).then(([data, anesthetics]) => {
     data.forEach(d => d.signal = d.signal.toLowerCase());
 
-    const allDrugs = [...new Set(anesthetics
-        .map(d => d.tname)
-        .filter(name => name.toLowerCase().includes("rate"))
-      )];      
+    const allDrugs = [...new Set(anesthetics.map(d => d.tname).filter(name => name.toLowerCase().includes("rate")))];
     const drugNameMap = {
         "orchestra/rftn20_rate": "Remifentanil",
         "orchestra/ppf20_rate": "Propofol"
-      };
-      
+    };
 
     drugSelect.selectAll("option")
       .data(["All", ...allDrugs])
       .enter().append("option")
       .text(d => d === "All" ? "All" : drugNameMap[d.toLowerCase()] || d)
       .attr("value", d => d);
-    
 
     anesthetics.forEach(d => {
         d.tname = d.tname.toLowerCase();
         d.optype = d.optype.trim();
     });
 
+    const vitals = [...new Set(data.map(d => d.signal))];
+    const groups = ["optype", "emop"];
 
-  const vitals = [...new Set(data.map(d => d.signal))];
-  const groups = ["optype", "emop"];
+    vitalSelect.selectAll("option")
+      .data(vitals).enter().append("option")
+      .text(d => d).attr("value", d => d);
 
-  vitalSelect.selectAll("option")
-    .data(vitals).enter().append("option")
-    .text(d => d).attr("value", d => d);
+    groupSelect.selectAll("option")
+      .data(groups).enter().append("option")
+      .text(d => d === "optype" ? "Surgery Type" : "Emergency Status")
+      .attr("value", d => d);
 
-  groupSelect.selectAll("option")
-    .data(groups).enter().append("option")
-    .text(d => d === "optype" ? "Surgery Type" : "Emergency Status")
-    .attr("value", d => d);
+    function updateChart() {
+      const selectedVitals = Array.from(vitalSelect.property("selectedOptions")).map(opt => opt.value);
+      const selectedGroup = groupSelect.property("value");
+      const selectedDrug = drugSelect.property("value").toLowerCase();
 
-  function updateChart() {
-    const selectedVital = vitalSelect.property("value");
-    const selectedGroup = groupSelect.property("value");
-    const selectedDrug = drugSelect.property("value").toLowerCase();
+      const isSingleSurgery = activeGroups.size === 1 || activeGroups.size === 0;
+      if (selectedVitals.length > 1 && !isSingleSurgery) {
+        alert("You can only select multiple vitals when one surgery type is selected.");
+        return;
+      }
 
-    const filtered = data.filter(d => d.signal === selectedVital);
-    const nested = d3.groups(filtered, d => d[selectedGroup]);
+      const filtered = data.filter(d => selectedVitals.includes(d.signal));
+      const nested = d3.groups(filtered, d => d[selectedGroup]);
 
-    const summary = nested.map(([key, values]) => {
-      const binSize = 0.01;
-      const binned = d3.groups(values, d => Math.round(d.norm_time / binSize) * binSize)
-        .map(([t, pts]) => {
-          const v = pts.map(p => p.value);
-          const mean = d3.mean(v);
-          const sd = d3.deviation(v);
-          return {
-            norm_time: +t,
-            mean: mean,
-            sd: sd,
-            value: v[0] // just grab the first one for now — can refine later
-          };
+      const summary = nested.flatMap(([key, values]) => {
+        return selectedVitals.map(vital => {
+          const subset = values.filter(d => d.signal === vital);
+          const binned = d3.groups(subset, d => Math.round(d.norm_time / 0.01) * 0.01)
+            .map(([t, pts]) => {
+              const v = pts.map(p => p.value);
+              return {
+                norm_time: +t,
+                mean: d3.mean(v),
+                sd: d3.deviation(v),
+                value: v[0]
+              };
+            });
+          return { key: `${key} - ${vital}`, values: binned.sort((a, b) => a.norm_time - b.norm_time) };
         });
-      
-      return { key, values: binned.sort((a, b) => a.norm_time - b.norm_time) };
-    });
-    //visable being the types of surgey we want to dispaly 
-    const visible = summary.filter(d => activeGroups.size === 0 || activeGroups.has(d.key));
+      });
 
-    y.domain([
-      d3.min(visible, s => d3.min(s.values, d => d.mean - (d.sd || 0))),
-      d3.max(visible, s => d3.max(s.values, d => d.mean + (d.sd || 0)))
-    ]);
+      const visible = summary.filter(d => activeGroups.size === 0 || activeGroups.has(d.key.split(" - ")[0]));
 
-    svg.select(".x-axis").call(xAxis);
+      y.domain([
+        d3.min(visible, s => d3.min(s.values, d => d.mean - (d.sd || 0))),
+        d3.max(visible, s => d3.max(s.values, d => d.mean + (d.sd || 0)))
+      ]);
 
-    
-  // Add shaded zones only for danger area
-  if (
-    vitalSelect.property("value").toLowerCase() === "map" &&
-    groupSelect.property("value") === "optype"
-  ){
-    const yMin = y.domain()[0];
-    const yMax = y.domain()[1];
+      svg.select(".x-axis").call(xAxis);
+      svg.select(".y-axis").call(yAxis);
 
-    const dangerZones = [
-      {
-        label: "Dangerously Low (< 60)",
-        min: Math.max(0, yMin),
-        max: Math.min(60, yMax),
-        color: "#fdd"
-      },
-      {
-        label: "Potentially High (> 120)",
-        min: Math.max(120, yMin),
-        max: Math.min(200, yMax),
-        color: "#ffe5b4"
-      }
-    ];
+      svg.selectAll(".line").data(visible, d => d.key)
+        .join("path")
+        .attr("class", "line")
+        .attr("fill", "none")
+        .attr("stroke", d => color(d.key))
+        .attr("stroke-width", 2)
+        .attr("d", d => line(d.values));
 
-    dangerZones.forEach(zone => {
-      if (zone.min < zone.max) {
-        svg.append("rect")
-          .attr("class", "danger-zone")
-          .attr("x", 0)
-          .attr("width", width)
-          .attr("y", y(zone.max))
-          .attr("height", y(zone.min) - y(zone.max))
-          .attr("fill", zone.color)
-          .attr("opacity", 0.2);
-      }
-    });
-  }
-    svg.select(".y-axis").call(yAxis);
+      svg.selectAll(".hover-point").remove();
 
-    svg.selectAll(".line").data(visible, d => d.key)
-      .join("path")
-      .attr("class", "line")
-      .attr("fill", "none")
-      .attr("stroke", d => color(d.key))
-      .attr("stroke-width", 2)
-      .attr("d", d => line(d.values));
+      visible.forEach(group => {
+        const groupKey = group.key;
+        const groupColor = color(groupKey);
+
+        svg.selectAll(`.hover-point-${groupKey}`)
+          .data(group.values)
+          .enter()
+          .append("circle")
+          .attr("class", "hover-point")
+          .attr("cx", d => x(d.norm_time))
+          .attr("cy", d => y(d.mean))
+          .attr("r", 5)
+          .attr("fill", groupColor)
+          .attr("fill-opacity", 0)
+          .attr("stroke", "none")
+          .on("mouseover", function(event, d) {
+            const zScore = d.sd ? ((d.value - d.mean) / d.sd).toFixed(2) : "N/A";
+            d3.select(this).transition().duration(100).attr("r", 6).attr("fill-opacity", 0.4);
+            tooltip.style("opacity", 1)
+              .html(`<strong>${groupKey}</strong><br>Value: ${d.value?.toFixed(1) ?? "N/A"}<br>Mean: ${d.mean?.toFixed(1) ?? "N/A"}<br>SD: ${d.sd?.toFixed(1) ?? "N/A"}<br>Z-score: ${zScore}`)
+              .style("left", (event.pageX + 10) + "px")
+              .style("top", (event.pageY - 28) + "px");
+          })
+          .on("mouseout", function() {
+            d3.select(this).transition().duration(100).attr("r", 5).attr("fill-opacity", 0);
+            tooltip.style("opacity", 0);
+          });
+      });
 
       const legendContainer = d3.select("#legend");
-      legendContainer.html(""); 
+      legendContainer.html("");
       const legendItems = legendContainer.selectAll("div")
-      .data(summary.map(d => d.key))
-      .enter()
-      .append("div")
-      .attr("class", "legend-item")
-      .style("cursor", "pointer")
-      //lets user know what is selected by increaseing opacity of selected surguries 
-      .style("opacity", d => activeGroups.size === 0 || activeGroups.has(d) ? 1 : 0.3)
-      .on("click", (event, key) => {
-        if (activeGroups.has(key)) {
-          activeGroups.delete(key);
-        } else {
-          activeGroups.add(key);
-        }
-        updateChart();
-      })
-      .on("mouseover", (event, key) => {
-        svg.selectAll(".line").style("opacity", d => d.key === key ? 1 : 0.1);
-        svg.selectAll(".area").style("opacity", d => d.key === key ? 0.3 : 0.05);
-      })
-      .on("mouseout", () => {
-        svg.selectAll(".line").style("opacity", 1);
-        svg.selectAll(".area").style("opacity", 0.2);
-      });
-
-    legendItems.append("span")
-      .attr("class", "legend-color")
-      .style("background-color", d => color(d));
-
-      if (
-        vitalSelect.property("value").toLowerCase() === "map" &&
-        groupSelect.property("value") === "optype"
-      ) {
-        [
-          { label: "Dangerously Low (< 60)", color: "#fdd" },
-          { label: "Potentially High (> 120)", color: "#ffe5b4" }
-        ].forEach(zone => {
-          const item = legendContainer.append("div")
-            .attr("class", "legend-item")
-            .style("opacity", 1);
-      
-          item.append("span")
-            .attr("class", "legend-color")
-            .style("background-color", zone.color);
-      
-          item.append("span")
-            .attr("class", "legend-label")
-            .text(zone.label);
+        .data(summary.map(d => d.key))
+        .enter()
+        .append("div")
+        .attr("class", "legend-item")
+        .style("cursor", "pointer")
+        .style("opacity", d => activeGroups.size === 0 || activeGroups.has(d.key.split(" - ")[0]) ? 1 : 0.3)
+        .on("click", (event, key) => {
+          const groupName = key.split(" - ")[0];
+          if (activeGroups.has(groupName)) {
+            activeGroups.delete(groupName);
+          } else {
+            activeGroups.add(groupName);
+          }
+          updateChart();
         });
-      }
 
+      legendItems.append("span")
+        .attr("class", "legend-color")
+        .style("background-color", d => color(d.key));
 
-    legendItems.append("span")
-      .attr("class", "legend-label")
-      .text(d => d.length > 20 ? d.slice(0, 18) + "…" : d);
+      legendItems.append("span")
+        .attr("class", "legend-label")
+        .text(d => d);
+    }
 
-// Remove old hover points
-svg.selectAll(".hover-point").remove();
-
-  // Add hover dots + tooltip
-  visible.forEach(group => {
-    const groupKey = group.key;
-    const groupColor = color(groupKey);
-
-    svg.selectAll(`.hover-point-${groupKey}`)
-      .data(group.values)
-      .enter()
-      .append("circle")
-      .attr("class", "hover-point")
-      .attr("cx", d => x(d.norm_time))
-      .attr("cy", d => y(d.mean))
-      .attr("r", 5)
-      .attr("fill", groupColor)
-      .attr("fill-opacity", 0)
-      .attr("stroke", "none")
-      .on("mouseover", function(event, d) {
-        const zScore = d.sd ? ((d.value - d.mean) / d.sd).toFixed(2) : "N/A";
-
-        d3.select(this)
-          .transition().duration(100)
-          .attr("r", 6)
-          .attr("fill-opacity", 0.4);
-
-        tooltip
-          .style("opacity", 1)
-          .html(`
-            <strong>${selectedVital.toUpperCase()}</strong><br>
-            Value: ${d.value?.toFixed(1) ?? "N/A"}<br>
-            Mean: ${d.mean?.toFixed(1) ?? "N/A"}<br>
-            SD: ${d.sd?.toFixed(1) ?? "N/A"}<br>
-            Z-score: ${zScore}
-          `)
-          .style("left", (event.pageX + 10) + "px")
-          .style("top", (event.pageY - 28) + "px");
-      })
-      .on("mouseout", function() {
-        d3.select(this)
-          .transition().duration(100)
-          .attr("r", 5)
-          .attr("fill-opacity", 0);
-
-        tooltip.style("opacity", 0);
-      });
-  });
-
-
-
-  }
-
-  vitalSelect.on("change", updateChart);
-  groupSelect.on("change", updateChart);
-  drugSelect.on("change", updateChart);
-  vitalSelect.property("value", "map");
-  groupSelect.property("value", "emop");
-  drugSelect.property("value", "All");
-  updateChart();
+    vitalSelect.on("change", updateChart);
+    groupSelect.on("change", updateChart);
+    drugSelect.on("change", updateChart);
+    vitalSelect.property("value", "map");
+    groupSelect.property("value", "emop");
+    drugSelect.property("value", "All");
+    updateChart();
 });
