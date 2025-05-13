@@ -100,14 +100,6 @@ d3.csv("data/long_surgery_vitals.csv", d3.autoType).then(data => {
       .attr("stroke-width", 2)
       .attr("d", d => line(d.values));
 
-    svg.selectAll(".area").data(summary, d => d.key)
-      .join("path")
-      .attr("class", "area")
-      .attr("fill", d => color(d.key))
-      .attr("fill-opacity", 0.2)
-      .attr("stroke", "none")
-      .attr("d", d => area(d.values));
-
       const legendContainer = d3.select("#legend");
       legendContainer.html(""); 
       const legendItems = legendContainer.selectAll("div")
