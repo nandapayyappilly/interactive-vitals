@@ -87,7 +87,9 @@ Promise.all([
       const selectedGroup = groupSelect.property("value");
       const selectedDrug = drugSelect.property("value").toLowerCase();
 
-      const isSingleSurgery = activeGroups.size === 1 || activeGroups.size === 0;
+      const selectedGroupKeys = Array.from(activeGroups);
+      const isSingleSurgery = selectedGroupKeys.length === 1 || selectedGroupKeys.length === 0;
+
       if (selectedVitals.length > 1 && !isSingleSurgery) {
         alert("You can only select multiple vitals when one surgery type is selected.");
         return;
