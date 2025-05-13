@@ -14,6 +14,9 @@ const drugSelect = d3.select("#drugSelect");
 const x = d3.scaleLinear().domain([0, 1]).range([0, width]);
 const y = d3.scaleLinear().range([height, 0]);
 
+const vitalSelect = d3.select("#vitalSelect");
+
+
 svg.append("g").attr("transform", `translate(0,${height})`).attr("class", "x-axis");
 svg.append("g").attr("class", "y-axis");
 
@@ -30,7 +33,11 @@ svg.append("text")
   .attr("x", -height / 2)
   .attr("y", -margin.left + 15)
   .attr("class", "axis-label")
-  .text("Average Vital Value");
+  .text(() =>
+    vitalSelect.property("value") === "stability_index"
+      ? "Stability Index"
+      : "Average Vital Value"
+  );
 
 const xAxis = d3.axisBottom(x).tickFormat(d3.format(".0%"));
 const yAxis = d3.axisLeft(y);
@@ -48,14 +55,13 @@ const area = d3.area()
 
 const color = d3.scaleOrdinal(d3.schemeCategory10);
 
-const vitalSelect = d3.select("#vitalSelect");
 const groupSelect = d3.select("#groupSelect");
 
 let activeGroups = new Set();
 
 //loading all data
 Promise.all([
-    d3.csv("data/long_surgery_vitals.csv", d3.autoType),
+    d3.csv("data/surgery_vitals_index.csv", d3.autoType),
     d3.csv("data/anesthetic_start_times.csv", d3.autoType)
     ]).then(([data, anesthetics]) => {
     data.forEach(d => d.signal = d.signal.toLowerCase());
@@ -87,8 +93,11 @@ Promise.all([
   const groups = ["optype", "emop"];
 
   vitalSelect.selectAll("option")
-    .data(vitals).enter().append("option")
-    .text(d => d).attr("value", d => d);
+    .data(["stability_index", ...vitals])
+    .enter().append("option")
+    .text(d => d === "stability_index" ? "Stability Index" : d.toUpperCase())
+    .attr("value", d => d);
+
 
   groupSelect.selectAll("option")
     .data(groups).enter().append("option")
@@ -100,14 +109,18 @@ Promise.all([
     const selectedGroup = groupSelect.property("value");
     const selectedDrug = drugSelect.property("value").toLowerCase();
 
-    const filtered = data.filter(d => d.signal === selectedVital);
+    const filtered = selectedVital === "stability_index"
+      ? data.filter(d => d.stability_index != null)
+      : data.filter(d => d.signal === selectedVital);
     const nested = d3.groups(filtered, d => d[selectedGroup]);
 
     const summary = nested.map(([key, values]) => {
       const binSize = 0.01;
       const binned = d3.groups(values, d => Math.round(d.norm_time / binSize) * binSize)
         .map(([t, pts]) => {
-          const v = pts.map(p => p.value);
+          const v = pts.map(p => 
+            selectedVital === "stability_index" ? p.stability_index : p.value
+          );
           const mean = d3.mean(v);
           const sd = d3.deviation(v);
           return {
